@@ -101,6 +101,8 @@ other, and both report independently. Each job:
    self-contained HTML report under `reports/`.
 3. Uploads both reports as build artifacts via `actions/upload-artifact`,
    using `if: always()` so the reports are published even when tests fail.
+4. Reports results to TestRail (`if: always()`, skipped if
+   `TESTRAIL_API_KEY` isn't configured) — see Test case management below.
 
 There is deliberately no `continue-on-error` anywhere in the pipeline: the
 API has confirmed bugs (see `BUGS.md`), and the pipeline is expected to
@@ -114,32 +116,43 @@ note these names do **not** carry the `SDET_` prefix used locally. Both must
 be configured under the repository's Settings → Secrets and variables →
 Actions for the workflow to run against a real deployment.
 
+The TestRail integration needs its own configuration: `TESTRAIL_BASE_URL`,
+`TESTRAIL_USERNAME`, and `TESTRAIL_PROJECT_ID` as repository variables, and
+`TESTRAIL_API_KEY` as a repository secret, for step 7 to run — it's
+automatically skipped otherwise (see above).
+
 ## Test case management
 
 Test names read cleanly as TestRail case titles, grouped by capability
-(Create / Read / Update / Delete & Authentication / Validation Boundaries /
-Environment Isolation) rather than by environment. The 75 pytest instances
+(Create / Delete & Authentication / Environment Isolation / Read / Update /
+Validation Boundaries) rather than by environment. The 75 pytest instances
 (parametrized by `dev`/`prod` and, for the data-driven suites, by value) roll
 up to 28 TestRail cases — the catalog lives in
 [`tests/data/testrail_cases.json`](tests/data/testrail_cases.json).
 
-`src/reporting/case_sync.py` is a one-time (idempotent, re-runnable) script
-that creates the sections/cases in TestRail from that catalog and writes the
-resulting `function -> case_id` map to
+`src/reporting/case_sync.py` is a one-time (idempotent, re-runnable — it
+matches by exact section name / case title, so renaming an entry in
+`testrail_cases.json` creates a new case rather than renaming the existing
+one) script that creates the sections/cases in TestRail from that catalog and
+writes the resulting `function -> case_id` map to
 [`tests/data/testrail_case_ids.json`](tests/data/testrail_case_ids.json).
-Run it again only if the catalog changes:
+Run it again only if the catalog changes. Note that `testrail_case_ids.json`
+pins case ids to this specific TestRail project, so anyone reusing this repo
+against their own TestRail account needs to re-run `case_sync.py` first to
+generate their own id mapping:
 
 ```bash
 python -m src.reporting.case_sync
 ```
 
 `src/reporting/testrail_reporter.py` runs as the last step of every CI job
-(`if: always()`, same as the artifact upload): it parses that job's JUnit XML,
-rolls each function's `dev`/`prod`/data-driven variants up into one result per
-case, creates a new TestRail Run, and posts the results — a case is Failed if
-any of its variants failed, with a comment listing every variant's outcome.
-Required env vars: `TESTRAIL_BASE_URL`, `TESTRAIL_USERNAME`,
-`TESTRAIL_API_KEY`, `TESTRAIL_PROJECT_ID` (see `.env.example`).
+(`if: always()`, skipped if TestRail isn't configured — see Continuous
+integration above): it parses that job's JUnit XML, rolls each function's
+`dev`/`prod`/data-driven variants up into one result per case, creates a new
+TestRail Run, and posts the results — a case is Failed if any of its variants
+failed, with a comment listing every variant's outcome. Required env vars:
+`TESTRAIL_BASE_URL`, `TESTRAIL_USERNAME`, `TESTRAIL_API_KEY`,
+`TESTRAIL_PROJECT_ID` (see `.env.example`).
 
 ## Known bugs
 
