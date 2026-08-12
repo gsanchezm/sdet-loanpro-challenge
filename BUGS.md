@@ -11,8 +11,8 @@ pytest tests/ -v --junitxml=reports/full-run.xml
 That run produced **98 tests collected, 78 passed, 20 failed**. Every failure below was
 independently reproduced with a direct HTTP request outside the test framework
 (exact status codes and response bodies are included as evidence). Expected behavior
-is drawn from `sdet_challenge_api.yml`, which documents `dev` and `prod` as
-functionally identical, isolated environments. The 20 failures reduce to the 5
+is drawn from the challenge's OpenAPI spec (`sdet_challenge_api.yml`), which documents
+`dev` and `prod` as functionally identical, isolated environments. The 20 failures reduce to the 5
 distinct defects below (several failing tests share a root cause): Bug 1 accounts
 for 8 failures, Bug 2 for 2, Bug 3 for 2, Bug 4 for 2, and Bug 5 for 6.
 
