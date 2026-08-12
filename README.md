@@ -221,16 +221,25 @@ Validation Boundaries) rather than by environment. The 75 pytest instances
 up to 28 TestRail cases — the catalog lives in
 [`tests/data/testrail_cases.json`](tests/data/testrail_cases.json).
 
-`src/reporting/case_sync.py` is a one-time (idempotent, re-runnable — it
-matches by exact section name / case title, so renaming an entry in
+Each catalog entry also carries `preconditions`, `steps`, and
+`expected_result` — the case's Preconditions/Steps/Expected Result fields in
+TestRail, derived from what the corresponding test function actually does
+(including the real endpoint, payload, and any parametrized data values), so
+a case reads as a standalone test case even outside this repo, not just a
+bare title.
+
+`src/reporting/case_sync.py` is an idempotent, re-runnable script (it matches
+by exact section name / case title, so renaming an entry in
 `testrail_cases.json` creates a new case rather than renaming the existing
-one) script that creates the sections/cases in TestRail from that catalog and
-writes the resulting `function -> case_id` map to
-[`tests/data/testrail_case_ids.json`](tests/data/testrail_case_ids.json).
-Run it again only if the catalog changes. Note that `testrail_case_ids.json`
-pins case ids to this specific TestRail project, so anyone reusing this repo
-against their own TestRail account needs to re-run `case_sync.py` first to
-generate their own id mapping:
+one) that creates the sections/cases in TestRail from that catalog, writes
+the resulting `function -> case_id` map to
+[`tests/data/testrail_case_ids.json`](tests/data/testrail_case_ids.json), and
+pushes each entry's preconditions/steps/expected result to TestRail —
+including for cases that already exist, so editing the catalog's text and
+re-running keeps TestRail in sync. Run it again whenever the catalog changes.
+Note that `testrail_case_ids.json` pins case ids to this specific TestRail
+project, so anyone reusing this repo against their own TestRail account
+needs to run `case_sync.py` first to generate their own id mapping:
 
 ```bash
 python -m src.reporting.case_sync

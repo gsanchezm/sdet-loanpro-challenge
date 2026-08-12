@@ -28,8 +28,11 @@ class TestRailClient:
     def get_cases(self, project_id: int, suite_id: int, section_id: int) -> list[dict]:
         return self._get(f"get_cases/{project_id}&suite_id={suite_id}&section_id={section_id}")["cases"]
 
-    def add_case(self, section_id: int, title: str) -> dict:
-        return self._post(f"add_case/{section_id}", {"title": title})
+    def add_case(self, section_id: int, title: str, **fields) -> dict:
+        return self._post(f"add_case/{section_id}", {"title": title, **fields})
+
+    def update_case(self, case_id: int, **fields) -> dict:
+        return self._post(f"update_case/{case_id}", fields)
 
     def add_run(self, project_id: int, suite_id: int, name: str, case_ids: list[int]) -> dict:
         return self._post(f"add_run/{project_id}", {

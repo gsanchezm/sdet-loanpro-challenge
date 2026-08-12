@@ -1,30 +1,226 @@
 [
-  {"section": "Create", "function": "test_create_user_returns_201_with_created_user", "title": "Create user returns 201 with the created user"},
-  {"section": "Create", "function": "test_create_user_rejects_duplicate_email", "title": "Create user rejects duplicate email"},
-  {"section": "Create", "function": "test_create_user_rejects_missing_required_field", "title": "Create user rejects a missing required field"},
-  {"section": "Create", "function": "test_create_user_ignores_or_rejects_unknown_fields", "title": "Create user handles unknown fields"},
-  {"section": "Read", "function": "test_list_users_returns_200_and_array", "title": "List users returns 200 and an array"},
-  {"section": "Read", "function": "test_list_users_contains_a_freshly_created_user", "title": "List users includes a freshly created user"},
-  {"section": "Read", "function": "test_get_user_by_email_returns_200", "title": "Get user by email returns 200"},
-  {"section": "Read", "function": "test_get_user_returns_404_for_unknown_email", "title": "Get user returns 404 for unknown email"},
-  {"section": "Read", "function": "test_get_user_handles_malformed_email_path_gracefully", "title": "Get user handles a malformed email gracefully"},
-  {"section": "Update", "function": "test_update_user_returns_200_with_updated_fields", "title": "Update user returns 200 with updated fields"},
-  {"section": "Update", "function": "test_update_user_returns_404_for_unknown_email", "title": "Update user returns 404 for unknown email"},
-  {"section": "Update", "function": "test_update_user_rejects_partial_body", "title": "Update user rejects a partial body"},
-  {"section": "Update", "function": "test_update_user_rejects_out_of_range_age", "title": "Update user rejects out-of-range age"},
-  {"section": "Update", "function": "test_update_user_changing_email_in_body", "title": "Update user changing the email in the body"},
-  {"section": "Delete & Authentication", "function": "test_delete_user_with_valid_token_returns_204", "title": "Delete user with a valid token returns 204"},
-  {"section": "Delete & Authentication", "function": "test_delete_user_without_auth_header_returns_401", "title": "Delete user without an auth header returns 401"},
-  {"section": "Delete & Authentication", "function": "test_delete_user_with_wrong_token_returns_401", "title": "Delete user with the wrong token returns 401"},
-  {"section": "Delete & Authentication", "function": "test_delete_user_with_authorization_header_instead_of_authentication", "title": "Delete user with Authorization header instead of Authentication"},
-  {"section": "Delete & Authentication", "function": "test_delete_user_returns_404_for_unknown_email", "title": "Delete user returns 404 for unknown email"},
-  {"section": "Delete & Authentication", "function": "test_delete_user_twice_is_not_a_server_error", "title": "Deleting a user twice is not a server error"},
-  {"section": "Validation Boundaries", "function": "test_create_user_accepts_boundary_ages", "title": "Create user accepts boundary ages (1 and 150)"},
-  {"section": "Validation Boundaries", "function": "test_create_user_rejects_out_of_range_ages", "title": "Create user rejects out-of-range ages"},
-  {"section": "Validation Boundaries", "function": "test_create_user_rejects_non_integer_ages", "title": "Create user rejects non-integer ages"},
-  {"section": "Validation Boundaries", "function": "test_create_user_rejects_invalid_email_format", "title": "Create user rejects invalid email format"},
-  {"section": "Validation Boundaries", "function": "test_error_response_has_consistent_shape_across_endpoints", "title": "Error responses have a consistent error shape"},
-  {"section": "Environment Isolation", "function": "test_user_created_in_dev_is_not_visible_in_prod", "title": "User created in dev is not visible in prod"},
-  {"section": "Environment Isolation", "function": "test_user_created_in_prod_is_not_visible_in_dev", "title": "User created in prod is not visible in dev"},
-  {"section": "Environment Isolation", "function": "test_identical_payload_behaves_the_same_in_both_environments", "title": "Identical invalid payload behaves the same in dev and prod"}
+  {
+    "section": "Create",
+    "function": "test_create_user_returns_201_with_created_user",
+    "title": "Create user returns 201 with the created user",
+    "preconditions": "No user exists yet with the freshly generated unique test email.",
+    "steps": "1. Build a valid payload via UserFactory.valid_payload: a fake name, a unique email of the form qa-<uuid>@sdet-test.dev, and an age between 1 and 150.\n2. Send POST /{env}/users with the payload as the JSON body.\n3. Repeat against both dev and prod (via the users_client fixture).\n4. Record the email for cleanup (DELETE /{env}/users/{email}) after the test.",
+    "expected_result": "Response is 201 Created. Response body's email, name, and age fields match the submitted payload's email, name, and age exactly."
+  },
+  {
+    "section": "Create",
+    "function": "test_create_user_rejects_duplicate_email",
+    "title": "Create user rejects duplicate email",
+    "preconditions": "No user exists yet with the freshly generated unique test email.",
+    "steps": "1. Build a valid payload via UserFactory.valid_payload with a unique email, a fake name, and an age between 1 and 150.\n2. Send POST /{env}/users with the payload and record the email for cleanup.\n3. Send POST /{env}/users again with the identical payload (same email, name, age).\n4. Repeat against both dev and prod.",
+    "expected_result": "First POST returns 201 Created. Second POST with the duplicate email returns 409 Conflict with a JSON body containing an \"error\" field."
+  },
+  {
+    "section": "Create",
+    "function": "test_create_user_rejects_missing_required_field",
+    "title": "Create user rejects a missing required field",
+    "preconditions": "None.",
+    "steps": "1. Build a valid payload via UserPayloadBuilder (fake name, unique qa-<uuid>@sdet-test.dev email, age 1-150), then remove one required field, for each of the following field names in turn: \"name\", \"email\", \"age\" (from parametrize_data.json's missing_required_fields dataset).\n2. Send POST /{env}/users with the resulting payload (missing that one field) as the JSON body.\n3. Repeat step 1-2 for each of the three missing-field cases and against both dev and prod.",
+    "expected_result": "For each missing-field case, response is 400 Bad Request with a JSON body containing an \"error\" field."
+  },
+  {
+    "section": "Create",
+    "function": "test_create_user_ignores_or_rejects_unknown_fields",
+    "title": "Create user handles unknown fields",
+    "preconditions": "No user exists yet with the freshly generated unique test email.",
+    "steps": "1. Build a payload via UserPayloadBuilder with a unique email and an added unknown field \"role\": \"admin\" (via with_extra_field).\n2. Send POST /{env}/users with the payload as the JSON body.\n3. Repeat against both dev and prod.\n4. If the response is 201 Created, record the email for cleanup (DELETE /{env}/users/{email}).",
+    "expected_result": "Response is either 201 Created with the created-user body omitting the unrecognized \"role\" field (unknown field silently ignored/stripped), or 400 Bad Request (unknown field rejected). No other status code is acceptable."
+  },
+  {
+    "section": "Read",
+    "function": "test_list_users_returns_200_and_array",
+    "title": "List users returns 200 and an array",
+    "preconditions": "None.",
+    "steps": "1. Send a GET request to /{env}/users (no request body).\n2. Repeat the request against both dev and prod (the users_client fixture runs this test once per environment).\n3. Inspect the HTTP status code and response body.",
+    "expected_result": "Response is 200 OK and the response body is a JSON array (a list, even if empty)."
+  },
+  {
+    "section": "Read",
+    "function": "test_list_users_contains_a_freshly_created_user",
+    "title": "List users includes a freshly created user",
+    "preconditions": "A user does not already exist with the freshly generated unique test email (format qa-<uuid>@sdet-test.dev).",
+    "steps": "1. Generate a unique test email via the unique_email fixture (qa-<uuid>@sdet-test.dev).\n2. Build a valid payload via UserFactory.valid_payload: {name: <fake name>, email: <unique email>, age: <random int 1-150>}.\n3. Send POST /{env}/users with that payload to create the user.\n4. Send GET /{env}/users to retrieve the full user list.\n5. Repeat steps 1-4 against both dev and prod.\n6. Teardown: delete the created user via DELETE /{env}/users/{email} (handled by the created_user_cleanup fixture).",
+    "expected_result": "The user is created successfully, and the subsequent GET /{env}/users response array contains an entry whose \"email\" field equals the freshly created unique email."
+  },
+  {
+    "section": "Read",
+    "function": "test_get_user_by_email_returns_200",
+    "title": "Get user by email returns 200",
+    "preconditions": "A user does not already exist with the freshly generated unique test email (format qa-<uuid>@sdet-test.dev).",
+    "steps": "1. Generate a unique test email via the unique_email fixture (qa-<uuid>@sdet-test.dev).\n2. Build a valid payload via UserFactory.valid_payload: {name: <fake name>, email: <unique email>, age: <random int 1-150>}.\n3. Send POST /{env}/users with that payload to create the user.\n4. Send GET /{env}/users/{email} using the same email.\n5. Repeat steps 1-4 against both dev and prod.\n6. Teardown: delete the created user via DELETE /{env}/users/{email} (handled by the created_user_cleanup fixture).",
+    "expected_result": "Response is 200 OK and the response body's \"email\" field matches the requested email."
+  },
+  {
+    "section": "Read",
+    "function": "test_get_user_returns_404_for_unknown_email",
+    "title": "Get user returns 404 for unknown email",
+    "preconditions": "No user exists with the email qa-does-not-exist@sdet-test.dev.",
+    "steps": "1. Send a GET request to /{env}/users/qa-does-not-exist@sdet-test.dev, an email that has never been created.\n2. Repeat the request against both dev and prod.\n3. Inspect the HTTP status code and response body.",
+    "expected_result": "Response is 404 Not Found with a JSON body containing an \"error\" field, per the spec, which documents only 200 and 404 for GET /{env}/users/{email}."
+  },
+  {
+    "section": "Read",
+    "function": "test_get_user_handles_malformed_email_path_gracefully",
+    "title": "Get user handles a malformed email gracefully",
+    "preconditions": "None.",
+    "steps": "1. Send a GET request to /{env}/users/not-an-email, using a syntactically malformed, non-email value as the email path parameter.\n2. Repeat the request against both dev and prod.\n3. Inspect the HTTP status code.",
+    "expected_result": "Response status code is either 400 Bad Request or 404 Not Found (malformed/non-existent input is rejected or reported as not found, never surfaced as an unhandled server error)."
+  },
+  {
+    "section": "Update",
+    "function": "test_update_user_returns_200_with_updated_fields",
+    "title": "Update user returns 200 with updated fields",
+    "preconditions": "No user exists yet with the unique test email that will be used for this case.",
+    "steps": "1. Create a user via POST /{env}/users with a valid body {name, email: <unique qa-*@sdet-test.dev address>, age}.\n2. Send PUT /{env}/users/{email} (same email, in the path) with a full body {name: \"Updated Name\", email: <same address>, age: 99}.\n3. Repeat steps 1-2 against both dev and prod.",
+    "expected_result": "Response is 200 OK. The response body reflects the update, with name equal to \"Updated Name\" and age equal to 99."
+  },
+  {
+    "section": "Update",
+    "function": "test_update_user_returns_404_for_unknown_email",
+    "title": "Update user returns 404 for unknown email",
+    "preconditions": "No user exists with the email qa-does-not-exist@sdet-test.dev.",
+    "steps": "1. Send PUT /{env}/users/qa-does-not-exist@sdet-test.dev with a complete, otherwise-valid body {name, email, age} (no prior create step for this email).\n2. Repeat against both dev and prod.",
+    "expected_result": "Response is 404 Not Found, since no user record exists at that email."
+  },
+  {
+    "section": "Update",
+    "function": "test_update_user_rejects_partial_body",
+    "title": "Update user rejects a partial body",
+    "preconditions": "No user exists yet with the unique test email that will be used for this case.",
+    "steps": "1. Create a user via POST /{env}/users with a valid body {name, email: <unique qa-*@sdet-test.dev address>, age}.\n2. Send PUT /{env}/users/{email} with a partial body containing only {\"name\": \"Only Name\"} (email and age omitted).\n3. Repeat steps 1-2 against both dev and prod.",
+    "expected_result": "Response is 400 Bad Request, since PUT performs a full replace and the UpdateUserRequest schema requires name, email, and age together; a body missing required fields is rejected."
+  },
+  {
+    "section": "Update",
+    "function": "test_update_user_rejects_out_of_range_age",
+    "title": "Update user rejects out-of-range age",
+    "preconditions": "No user exists yet with the unique test email that will be used for this case.",
+    "steps": "1. Create a user via POST /{env}/users with a valid body {name, email: <unique qa-*@sdet-test.dev address>, age}.\n2. Send PUT /{env}/users/{email} with a full body for the same email where age is set to 151 (one value above the documented maximum of 150).\n3. Repeat steps 1-2 against both dev and prod.",
+    "expected_result": "Response is 400 Bad Request, since age must satisfy the documented range of 1 to 150 inclusive and 151 exceeds it."
+  },
+  {
+    "section": "Update",
+    "function": "test_update_user_changing_email_in_body",
+    "title": "Update user changing the email in the body",
+    "preconditions": "No user exists with either of the two unique test emails used in this case (the original and the new/other one).",
+    "steps": "1. Create a user via POST /{env}/users at a unique email (the \"original\" address).\n2. Send PUT /{env}/users/{original email} (email in path) with a full valid body whose email field is a different, unused unique address (the \"other\" email) \u2014 name and age are otherwise valid.\n3. Send GET /{env}/users/{original email}.\n4. Send GET /{env}/users/{other email}.\n5. Repeat steps 1-4 against both dev and prod.",
+    "expected_result": "Per spec, PUT is a full replace of name/email/age, and the documented 409 applies only to a duplicate email, implying a rename to an unused address is a supported operation: the PUT response should be 200 echoing the new email, the user should subsequently be retrievable via GET at the new email and no longer found (404) at the original email. Neither GET should ever return a 5xx server error. The automated check is intentionally lenient (accepts PUT status 200/400/404/409 and either GET status 200/404) because the spec is ambiguous here \u2014 it records whichever outcome actually happens as a documented finding rather than asserting the spec-compliant behavior above as a hard pass/fail."
+  },
+  {
+    "section": "Delete & Authentication",
+    "function": "test_delete_user_with_valid_token_returns_204",
+    "title": "Delete user with a valid token returns 204",
+    "preconditions": "A user has been created via POST /{env}/users with a valid payload (random name, a unique generated test email, age 1-150).",
+    "steps": "1. Send DELETE /{env}/users/{email} for the user's email, with the request's default \"Authentication\" header set to the valid configured auth token.\n2. Repeat step 1 against both dev and prod.\n3. Send GET /{env}/users/{email} for the same email to confirm the record is gone.",
+    "expected_result": "The DELETE response is 204 No Content. The subsequent GET /{env}/users/{email} response is 404 Not Found, confirming the user no longer exists."
+  },
+  {
+    "section": "Delete & Authentication",
+    "function": "test_delete_user_without_auth_header_returns_401",
+    "title": "Delete user without an auth header returns 401",
+    "preconditions": "A user has been created via POST /{env}/users with a valid payload (random name, a unique generated test email, age 1-150).",
+    "steps": "1. Send DELETE /{env}/users/{email} for the user's email with no \"Authentication\" header present on the request at all (empty headers).\n2. Repeat step 1 against both dev and prod.",
+    "expected_result": "Response is 401 Unauthorized (per the spec, the \"Authentication\" header is required on every DELETE request) with an {error: string} body. The user record is not deleted."
+  },
+  {
+    "section": "Delete & Authentication",
+    "function": "test_delete_user_with_wrong_token_returns_401",
+    "title": "Delete user with the wrong token returns 401",
+    "preconditions": "A user has been created via POST /{env}/users with a valid payload (random name, a unique generated test email, age 1-150).",
+    "steps": "1. Send DELETE /{env}/users/{email} for the user's email with header \"Authentication: wrong-token\" (an incorrect token value).\n2. Repeat step 1 against both dev and prod.",
+    "expected_result": "Response is 401 Unauthorized with an {error: string} body, since the supplied token does not match the configured auth token. The user record is not deleted."
+  },
+  {
+    "section": "Delete & Authentication",
+    "function": "test_delete_user_with_authorization_header_instead_of_authentication",
+    "title": "Delete user with Authorization header instead of Authentication",
+    "preconditions": "A user has been created via POST /{env}/users with a valid payload (random name, a unique generated test email, age 1-150).",
+    "steps": "1. Send DELETE /{env}/users/{email} for the user's email using header \"Authorization: Bearer <token>\" (the correct/valid token value, but sent under the header name \"Authorization\" instead of the spec's \"Authentication\") \u2014 omit the \"Authentication\" header entirely.\n2. Repeat step 1 against both dev and prod.",
+    "expected_result": "Per the spec, only the exact header name \"Authentication\" grants access, so \"Authorization: Bearer <token>\" does not constitute valid authentication. Response should be 401 Unauthorized with an {error: string} body, and the user record should not be deleted. The automated check is intentionally lenient (accepts either 204 or 401) because it exists to characterize whether the real app is more permissive than its own spec here, not to enforce the spec-compliant 401 above as a hard pass/fail \u2014 the actual status observed is what matters and is recorded as a documented finding."
+  },
+  {
+    "section": "Delete & Authentication",
+    "function": "test_delete_user_returns_404_for_unknown_email",
+    "title": "Delete user returns 404 for unknown email",
+    "preconditions": "No user exists with the email \"qa-does-not-exist@sdet-test.dev\".",
+    "steps": "1. Send DELETE /{env}/users/qa-does-not-exist@sdet-test.dev with the valid \"Authentication\" header set to the configured auth token.\n2. Repeat step 1 against both dev and prod.",
+    "expected_result": "Response is 404 Not Found with an {error: string} body, since no user exists for that email."
+  },
+  {
+    "section": "Delete & Authentication",
+    "function": "test_delete_user_twice_is_not_a_server_error",
+    "title": "Deleting a user twice is not a server error",
+    "preconditions": "A user has been created via POST /{env}/users with a valid payload (random name, a unique generated test email, age 1-150).",
+    "steps": "1. Send DELETE /{env}/users/{email} for the user's email with the valid \"Authentication\" header (first delete).\n2. Immediately send DELETE /{env}/users/{email} again for the same, now-deleted, email with the same valid \"Authentication\" header (second delete).\n3. Repeat steps 1-2 against both dev and prod.",
+    "expected_result": "The first DELETE returns 204 No Content. The second DELETE, against an already-deleted user, returns either 204 or 404 Not Found \u2014 in no case does it return a 5xx server error."
+  },
+  {
+    "section": "Validation Boundaries",
+    "function": "test_create_user_accepts_boundary_ages",
+    "title": "Create user accepts boundary ages (1 and 150)",
+    "preconditions": "No user exists with the auto-generated unique test email (qa-<uuid4>@sdet-test.dev) that will be used in the payload.",
+    "steps": "1. Build a valid user payload (random name, generated unique email) with age set to each of the boundary values: 1, 150.\n2. Send POST /{env}/users with the payload for each age value.\n3. Repeat against both dev and prod.\n4. Register the created email for cleanup (DELETE after the test).",
+    "expected_result": "Response is 201 Created for both boundary ages (1 and 150), and the response body's \"age\" field equals the submitted value, confirming the inclusive 1-150 age range is accepted at its edges."
+  },
+  {
+    "section": "Validation Boundaries",
+    "function": "test_create_user_rejects_out_of_range_ages",
+    "title": "Create user rejects out-of-range ages",
+    "preconditions": "No user exists with the auto-generated unique test email used in the payload.",
+    "steps": "1. Build a user payload with a generated unique email and age set to each of: 0, -1, 151, 1000.\n2. Send POST /{env}/users with the payload for each age value.\n3. Repeat against both dev and prod.",
+    "expected_result": "Response is 400 Bad Request for every out-of-range age (0, -1, 151, 1000), since the CreateUserRequest schema restricts age to the inclusive range 1-150."
+  },
+  {
+    "section": "Validation Boundaries",
+    "function": "test_create_user_rejects_non_integer_ages",
+    "title": "Create user rejects non-integer ages",
+    "preconditions": "No user exists with the auto-generated unique test email used in the payload.",
+    "steps": "1. Build a user payload with a generated unique email and age set to each of: 25.5 (float), \"30\" (string), null.\n2. Send POST /{env}/users with the payload for each age value.\n3. Repeat against both dev and prod.",
+    "expected_result": "Response is 400 Bad Request for every non-integer age value (25.5, \"30\", null), since the CreateUserRequest schema requires age to be an integer."
+  },
+  {
+    "section": "Validation Boundaries",
+    "function": "test_create_user_rejects_invalid_email_format",
+    "title": "Create user rejects invalid email format",
+    "preconditions": "No user exists with any of the four literal test emails under test (\"not-an-email\", \"missing-at-sign.com\", \"\", \"   \"); none carry the qa- prefix, so a prior run that hit the 201 bug path may have left one behind and it would not be swept by the session cleanup.",
+    "steps": "1. Build a valid user payload (random name, valid random age 1-150) with email set to each of: \"not-an-email\", \"missing-at-sign.com\", \"\" (empty string), \"   \" (whitespace-only).\n2. Send POST /{env}/users with the payload for each email value.\n3. Repeat against both dev and prod.\n4. If any response unexpectedly returns 201, register that email for cleanup (DELETE after the test).",
+    "expected_result": "Response is 400 Bad Request for every malformed email (\"not-an-email\", \"missing-at-sign.com\", \"\", \"   \"), since the CreateUserRequest schema requires a valid email address."
+  },
+  {
+    "section": "Validation Boundaries",
+    "function": "test_error_response_has_consistent_shape_across_endpoints",
+    "title": "Error responses have a consistent error shape",
+    "preconditions": "No user exists with the email qa-does-not-exist@sdet-test.dev.",
+    "steps": "1. Send GET /{env}/users/qa-does-not-exist@sdet-test.dev for the non-existent user.\n2. Send POST /{env}/users with a payload missing the required \"email\" field (only name and age present).\n3. Send DELETE /{env}/users/qa-does-not-exist@sdet-test.dev with an \"Authentication\" header set to the configured auth token.\n4. Repeat all three requests against both dev and prod.",
+    "expected_result": "Each of the three responses (GET, POST, DELETE) has a status code >= 400, and each response body conforms to the ErrorResponse schema - a JSON object with an \"error\" string field - consistently across all three endpoints."
+  },
+  {
+    "section": "Environment Isolation",
+    "function": "test_user_created_in_dev_is_not_visible_in_prod",
+    "title": "User created in dev is not visible in prod",
+    "preconditions": "No user exists with the generated test email in either the dev or prod environment.",
+    "steps": "1. Generate a valid user payload (random name, email formatted qa-<uuid>@sdet-test.dev, age between 1 and 150).\n2. Send POST /dev/users with the payload.\n3. Send GET /dev/users/{email} using the same email from the payload.\n4. Send GET /prod/users/{email} using the same email.\n5. Clean up by sending DELETE /dev/users/{email} and DELETE /prod/users/{email}.",
+    "expected_result": "POST /dev/users returns 201 Created. GET /dev/users/{email} returns 200 OK for the user just created in dev. GET /prod/users/{email} returns 404 Not Found \u2014 dev and prod are documented as functionally identical but isolated environments, so a user created in dev must not be visible in prod."
+  },
+  {
+    "section": "Environment Isolation",
+    "function": "test_user_created_in_prod_is_not_visible_in_dev",
+    "title": "User created in prod is not visible in dev",
+    "preconditions": "No user exists with the generated test email in either the dev or prod environment.",
+    "steps": "1. Generate a valid user payload (random name, email formatted qa-<uuid>@sdet-test.dev, age between 1 and 150).\n2. Send POST /prod/users with the payload.\n3. Send GET /prod/users/{email} using the same email from the payload.\n4. Send GET /dev/users/{email} using the same email.\n5. Clean up by sending DELETE /dev/users/{email} and DELETE /prod/users/{email}.",
+    "expected_result": "POST /prod/users returns 201 Created. GET /prod/users/{email} returns 200 OK for the user just created in prod. GET /dev/users/{email} returns 404 Not Found \u2014 dev and prod are documented as functionally identical but isolated environments, so a user created in prod must not be visible in dev."
+  },
+  {
+    "section": "Environment Isolation",
+    "function": "test_identical_payload_behaves_the_same_in_both_environments",
+    "title": "Identical invalid payload behaves the same in dev and prod",
+    "preconditions": "None.",
+    "steps": "1. Build the payload {\"name\": \"Jane Doe\"}, omitting both \"email\" and \"age\" (both required by the CreateUserRequest schema).\n2. Send POST /dev/users with this payload.\n3. Send POST /prod/users with the identical payload.\n4. Compare the HTTP status codes returned by the two calls.",
+    "expected_result": "POST /dev/users and POST /prod/users return the same HTTP status code for the identical invalid payload. The spec documents dev and prod as functionally identical, isolated environments, so any divergence in status code for the same input is itself a defect, independent of which code is \"correct\" (per the CreateUserRequest schema, the spec-compliant response would be 400 Bad Request with an {\"error\": string} body, since email and age are required) \u2014 the case's pass condition is that dev and prod agree, not any specific code."
+  }
 ]
