@@ -1,5 +1,6 @@
 # tests/users/test_create.py
 import pytest
+from src.data.loader import load_dataset
 from src.factories.user_factory import UserFactory, UserPayloadBuilder
 
 
@@ -26,7 +27,7 @@ def test_create_user_rejects_duplicate_email(users_client, unique_email, created
     assert "error" in second.json()
 
 
-@pytest.mark.parametrize("missing_field", ["name", "email", "age"])
+@pytest.mark.parametrize("missing_field", load_dataset("missing_required_fields"))
 def test_create_user_rejects_missing_required_field(users_client, missing_field):
     payload = UserPayloadBuilder().without_field(missing_field).build()
     response = users_client.create_user(payload)

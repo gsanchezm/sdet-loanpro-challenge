@@ -1,0 +1,7 @@
+{
+  "missing_required_fields": ["name", "email", "age"],
+  "boundary_ages": [1, 150],
+  "out_of_range_ages": [0, -1, 151, 1000],
+  "non_integer_ages": [25.5, "30", null],
+  "invalid_emails": ["not-an-email", "missing-at-sign.com", "", "   "]
+}
