@@ -36,7 +36,7 @@ def test_delete_user_with_authorization_header_instead_of_authentication(users_c
     token = get_settings().auth_token
     response = users_client.delete_user(unique_email, headers={"Authorization": f"Bearer {token}"})
     # No fixed expectation: per the spec this should behave like "no valid auth" (401).
-    # A 204 here would mean the real app diverges from its own spec — a Task 14 finding either way.
+    # A 204 here would mean the real app diverges from its own spec — a documented finding either way.
     assert response.status_code in (204, 401)
 
 
