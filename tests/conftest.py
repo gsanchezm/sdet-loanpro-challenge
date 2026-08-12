@@ -1,6 +1,7 @@
 # tests/conftest.py
 import os
 import uuid
+import warnings
 import pytest
 from src.config.settings import get_settings
 from src.clients.base_client import BaseClient
@@ -28,15 +29,18 @@ def client_for(env: str) -> UsersClient:
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_orphaned_test_users():
-    for env in ALL_ENVIRONMENTS:
-        client = client_for(env)
-        response = client.list_users()
-        if response.status_code != 200:
-            continue
-        for user in response.json():
-            email = user.get("email", "")
-            if email.startswith(TEST_EMAIL_PREFIX):
-                client.delete_user(email)
+    for env in _active_environments():
+        try:
+            client = client_for(env)
+            response = client.list_users()
+            if response.status_code != 200:
+                continue
+            for user in response.json():
+                email = user.get("email", "")
+                if email.startswith(TEST_EMAIL_PREFIX):
+                    client.delete_user(email)
+        except Exception as exc:
+            warnings.warn(f"cleanup_orphaned_test_users: sweep failed for env={env!r}: {exc}")
     yield
 
 

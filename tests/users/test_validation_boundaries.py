@@ -1,6 +1,7 @@
 # tests/users/test_validation_boundaries.py
 import pytest
 from src.factories.user_factory import UserPayloadBuilder
+from src.models.user import ErrorResponse
 
 
 @pytest.mark.parametrize("age", [1, 150])
@@ -45,7 +46,4 @@ def test_error_response_has_consistent_shape_across_endpoints(users_client):
     ]
     for response in responses:
         assert response.status_code >= 400
-        body = response.json()
-        assert isinstance(body, dict)
-        assert "error" in body
-        assert isinstance(body["error"], str)
+        ErrorResponse.model_validate(response.json())
