@@ -7,6 +7,7 @@ from src.clients.base_client import BaseClient
 from src.clients.users_client import UsersClient
 
 ALL_ENVIRONMENTS = ["dev", "prod"]
+VALID_ENVIRONMENTS = set(ALL_ENVIRONMENTS)
 TEST_EMAIL_PREFIX = "qa-"
 
 
@@ -14,7 +15,14 @@ def _active_environments() -> list[str]:
     raw = os.environ.get("TEST_ENVIRONMENTS")
     if not raw:
         return ALL_ENVIRONMENTS
-    return [env.strip() for env in raw.split(",") if env.strip()]
+    envs = [env.strip() for env in raw.split(",") if env.strip()]
+    invalid = [env for env in envs if env not in VALID_ENVIRONMENTS]
+    if invalid:
+        raise ValueError(
+            f"TEST_ENVIRONMENTS contains invalid value(s) {invalid}; "
+            f"must be a subset of {sorted(VALID_ENVIRONMENTS)}"
+        )
+    return envs
 
 
 def client_for(env: str) -> UsersClient:
