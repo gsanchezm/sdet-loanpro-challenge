@@ -111,6 +111,16 @@ note these names do **not** carry the `SDET_` prefix used locally. Both must
 be configured under the repository's Settings → Secrets and variables →
 Actions for the workflow to run against a real deployment.
 
+## Test case management
+
+Test names and docstrings are written to read cleanly as TestRail case
+titles, grouped by capability (Create / Read / Update / Delete / Auth /
+Validation / Isolation) rather than by environment — see `tests/users/`.
+This suite does not push results to TestRail yet: that integration
+(reporting pass/fail per case at the end of a CI run) is pending API
+credentials for the target TestRail instance and is not part of this
+submission.
+
 ## Known bugs
 
 Bugs found while building and running this suite are documented in
