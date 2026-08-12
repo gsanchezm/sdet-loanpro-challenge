@@ -1,19 +1,18 @@
 from pydantic import BaseModel, EmailStr, Field
 
-class User(BaseModel):
+class UserPayload(BaseModel):
     name: str
     email: EmailStr
     age: int = Field(ge=1, le=150)
 
-class CreateUserRequest(BaseModel):
-    name: str
-    email: EmailStr
-    age: int = Field(ge=1, le=150)
+class User(UserPayload):
+    pass
 
-class UpdateUserRequest(BaseModel):
-    name: str
-    email: EmailStr
-    age: int = Field(ge=1, le=150)
+class CreateUserRequest(UserPayload):
+    pass
+
+class UpdateUserRequest(UserPayload):
+    pass
 
 class ErrorResponse(BaseModel):
     error: str
