@@ -1,9 +1,10 @@
 import pytest
+from src.data.loader import load_dataset
 from src.factories.user_factory import UserPayloadBuilder
 from src.models.user import ErrorResponse
 
 
-@pytest.mark.parametrize("age", [1, 150])
+@pytest.mark.parametrize("age", load_dataset("boundary_ages"))
 def test_create_user_accepts_boundary_ages(users_client, unique_email, created_user_cleanup, age):
     payload = UserPayloadBuilder().with_email(unique_email).with_age(age).build()
     response = users_client.create_user(payload)
@@ -12,21 +13,21 @@ def test_create_user_accepts_boundary_ages(users_client, unique_email, created_u
     assert response.json()["age"] == age
 
 
-@pytest.mark.parametrize("age", [0, -1, 151, 1000])
+@pytest.mark.parametrize("age", load_dataset("out_of_range_ages"))
 def test_create_user_rejects_out_of_range_ages(users_client, unique_email, age):
     payload = UserPayloadBuilder().with_email(unique_email).with_age(age).build()
     response = users_client.create_user(payload)
     assert response.status_code == 400
 
 
-@pytest.mark.parametrize("age", [25.5, "30", None])
+@pytest.mark.parametrize("age", load_dataset("non_integer_ages"))
 def test_create_user_rejects_non_integer_ages(users_client, unique_email, age):
     payload = UserPayloadBuilder().with_email(unique_email).with_age(age).build()
     response = users_client.create_user(payload)
     assert response.status_code == 400
 
 
-@pytest.mark.parametrize("email", ["not-an-email", "missing-at-sign.com", "", "   "])
+@pytest.mark.parametrize("email", load_dataset("invalid_emails"))
 def test_create_user_rejects_invalid_email_format(users_client, email, created_user_cleanup):
     payload = UserPayloadBuilder().with_email(email).build()
     response = users_client.create_user(payload)

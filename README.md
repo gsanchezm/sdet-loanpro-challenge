@@ -51,6 +51,14 @@ To restrict a run to one environment, set `TEST_ENVIRONMENTS`:
 TEST_ENVIRONMENTS=dev pytest tests/ -v
 ```
 
+## Test data
+
+Parametrized values that used to be hardcoded in `@pytest.mark.parametrize`
+(boundary ages, invalid emails, missing-field names) live in
+[`tests/data/parametrize_data.json`](tests/data/parametrize_data.json),
+loaded through `src.data.loader.load_dataset`. To add a new boundary value,
+edit the JSON file — no test code changes needed.
+
 ## Running the suite locally
 
 ```bash
@@ -93,6 +101,8 @@ other, and both report independently. Each job:
    self-contained HTML report under `reports/`.
 3. Uploads both reports as build artifacts via `actions/upload-artifact`,
    using `if: always()` so the reports are published even when tests fail.
+4. Reports results to TestRail (`if: always()`, skipped if
+   `TESTRAIL_API_KEY` isn't configured) — see Test case management below.
 
 There is deliberately no `continue-on-error` anywhere in the pipeline: the
 API has confirmed bugs (see `BUGS.md`), and the pipeline is expected to
@@ -106,15 +116,43 @@ note these names do **not** carry the `SDET_` prefix used locally. Both must
 be configured under the repository's Settings → Secrets and variables →
 Actions for the workflow to run against a real deployment.
 
+The TestRail integration needs its own configuration: `TESTRAIL_BASE_URL`,
+`TESTRAIL_USERNAME`, and `TESTRAIL_PROJECT_ID` as repository variables, and
+`TESTRAIL_API_KEY` as a repository secret, for step 7 to run — it's
+automatically skipped otherwise (see above).
+
 ## Test case management
 
-Test names and docstrings are written to read cleanly as TestRail case
-titles, grouped by capability (Create / Read / Update / Delete / Auth /
-Validation / Isolation) rather than by environment — see `tests/users/`.
-This suite does not push results to TestRail yet: that integration
-(reporting pass/fail per case at the end of a CI run) is pending API
-credentials for the target TestRail instance and is not part of this
-submission.
+Test names read cleanly as TestRail case titles, grouped by capability
+(Create / Delete & Authentication / Environment Isolation / Read / Update /
+Validation Boundaries) rather than by environment. The 75 pytest instances
+(parametrized by `dev`/`prod` and, for the data-driven suites, by value) roll
+up to 28 TestRail cases — the catalog lives in
+[`tests/data/testrail_cases.json`](tests/data/testrail_cases.json).
+
+`src/reporting/case_sync.py` is a one-time (idempotent, re-runnable — it
+matches by exact section name / case title, so renaming an entry in
+`testrail_cases.json` creates a new case rather than renaming the existing
+one) script that creates the sections/cases in TestRail from that catalog and
+writes the resulting `function -> case_id` map to
+[`tests/data/testrail_case_ids.json`](tests/data/testrail_case_ids.json).
+Run it again only if the catalog changes. Note that `testrail_case_ids.json`
+pins case ids to this specific TestRail project, so anyone reusing this repo
+against their own TestRail account needs to re-run `case_sync.py` first to
+generate their own id mapping:
+
+```bash
+python -m src.reporting.case_sync
+```
+
+`src/reporting/testrail_reporter.py` runs as the last step of every CI job
+(`if: always()`, skipped if TestRail isn't configured — see Continuous
+integration above): it parses that job's JUnit XML, rolls each function's
+`dev`/`prod`/data-driven variants up into one result per case, creates a new
+TestRail Run, and posts the results — a case is Failed if any of its variants
+failed, with a comment listing every variant's outcome. Required env vars:
+`TESTRAIL_BASE_URL`, `TESTRAIL_USERNAME`, `TESTRAIL_API_KEY`,
+`TESTRAIL_PROJECT_ID` (see `.env.example`).
 
 ## Known bugs
 
@@ -131,14 +169,26 @@ src/
     users_client.py       # Users API surface built on top of base_client
   config/
     settings.py           # pydantic-settings config (SDET_ env vars, .env support)
+    testrail_settings.py  # pydantic-settings config (TESTRAIL_ env vars)
+  data/
+    loader.py              # loads tests/data/parametrize_data.json (lru_cache'd)
   factories/
     user_factory.py       # UserFactory (random valid payloads) and
                            # UserPayloadBuilder (fluent builder for edge cases)
   models/
     user.py                # User / CreateUserRequest / UpdateUserRequest / ErrorResponse
+  reporting/
+    testrail_client.py     # thin TestRail API v2 client (sections/cases/runs)
+    case_sync.py            # syncs tests/data/testrail_cases.json catalog to TestRail
+    junit_parser.py         # parses JUnit XML, groups results by function
+    testrail_reporter.py    # posts per-case results to TestRail after each CI job
 
 tests/
   conftest.py              # env-parametrized users_client fixture, cleanup fixtures
+  data/
+    parametrize_data.json    # boundary/invalid values loaded by src.data.loader
+    testrail_cases.json      # catalog of 28 TestRail cases (section + title per function)
+    testrail_case_ids.json   # function -> case_id map, written by case_sync.py
   users/
     test_create.py                  # POST /users
     test_read.py                    # GET /users, GET /users/{email}

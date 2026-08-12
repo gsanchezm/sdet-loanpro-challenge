@@ -51,7 +51,7 @@ def test_update_user_changing_email_in_body(users_client, unique_email, created_
 
     old_lookup = users_client.get_user(unique_email)
     new_lookup = users_client.get_user(other_email)
-    # No assertion on the exact outcome here on purpose — Task 14 records what
+    # No assertion on the exact outcome here on purpose — this records what
     # actually happens (rename, dual-accessible, or rejected) as a documented finding.
     assert response.status_code in (200, 400, 404, 409)
     assert old_lookup.status_code in (200, 404)

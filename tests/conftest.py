@@ -18,7 +18,7 @@ def _active_environments() -> list[str]:
 
 
 def client_for(env: str) -> UsersClient:
-    """Public on purpose: Task 12's environment-isolation suite imports this
+    """Public on purpose: the environment-isolation suite imports this
     directly instead of redefining it, since it needs both dev and prod
     clients regardless of TEST_ENVIRONMENTS filtering."""
     settings = get_settings()
