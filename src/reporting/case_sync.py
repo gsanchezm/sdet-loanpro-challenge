@@ -39,9 +39,9 @@ def sync_cases(client: TestRailClient, project_id: int, catalog: list[dict]) -> 
 def main() -> None:
     settings = get_testrail_settings()
     client = TestRailClient(settings.base_url, settings.username, settings.api_key)
-    catalog = json.loads(_CATALOG_FILE.read_text())
+    catalog = json.loads(_CATALOG_FILE.read_text(encoding="utf-8"))
     function_to_case_id = sync_cases(client, settings.project_id, catalog)
-    _CASE_IDS_FILE.write_text(json.dumps(function_to_case_id, indent=2, sort_keys=True) + "\n")
+    _CASE_IDS_FILE.write_text(json.dumps(function_to_case_id, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Synced {len(function_to_case_id)} cases -> {_CASE_IDS_FILE}")
 
 

@@ -1,4 +1,5 @@
 # src/reporting/testrail_reporter.py
+import html
 import json
 import os
 import sys
@@ -15,7 +16,7 @@ STATUS_ID = {True: 1, False: 5}
 
 
 def _format_comment(group: dict) -> str:
-    lines = [f"[{variant['variant_id'] or 'no-variant'}] {'PASSED' if variant['passed'] else 'FAILED: ' + (variant['message'] or '')}" for variant in group["variants"]]
+    lines = [f"[{variant['variant_id'] or 'no-variant'}] {'PASSED' if variant['passed'] else 'FAILED: ' + html.escape(variant['message'] or '')}" for variant in group["variants"]]
     return "\n".join(lines)
 
 
@@ -51,14 +52,22 @@ def write_step_summary(environment_label: str, results: list[dict], run_url: str
         f"[View run in TestRail]({run_url})",
         "",
     ]
-    with open(summary_path, "a") as handle:
+    with open(summary_path, "a", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
 
 
 def main(junit_xml_path: str, environment_label: str) -> None:
-    function_to_case_id = json.loads(_CASE_IDS_FILE.read_text())
+    if not Path(junit_xml_path).exists():
+        print(f"No JUnit XML at {junit_xml_path}; nothing to report")
+        return
+
+    function_to_case_id = json.loads(_CASE_IDS_FILE.read_text(encoding="utf-8"))
     grouped = group_by_function(parse_results(junit_xml_path))
     results = build_results(grouped, function_to_case_id)
+
+    if not results:
+        print("No mapped TestRail cases found in this JUnit file; skipping run creation")
+        return
 
     settings = get_testrail_settings()
     client = TestRailClient(settings.base_url, settings.username, settings.api_key)
