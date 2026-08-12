@@ -34,6 +34,7 @@ def test_create_user_rejects_missing_required_field(users_client, missing_field)
     assert "error" in response.json()
 
 
+@pytest.mark.characterization
 def test_create_user_ignores_or_rejects_unknown_fields(users_client, unique_email, created_user_cleanup):
     payload = UserPayloadBuilder().with_email(unique_email).with_extra_field("role", "admin").build()
     response = users_client.create_user(payload)

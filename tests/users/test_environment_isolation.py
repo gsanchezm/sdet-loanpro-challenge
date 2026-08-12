@@ -1,3 +1,4 @@
+import pytest
 from tests.conftest import client_for
 from src.factories.user_factory import UserFactory
 
@@ -38,6 +39,7 @@ def test_user_created_in_prod_is_not_visible_in_dev():
             prod_client.delete_user(email)
 
 
+@pytest.mark.characterization
 def test_identical_payload_behaves_the_same_in_both_environments():
     """The spec states 'identical behavior' between /dev and /prod. Any divergence
     in status code for the same invalid input is itself a bug, independent of
