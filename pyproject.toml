@@ -13,7 +13,6 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-html>=4.1",
-    "requests-mock>=1.11",
     "Faker>=22.0",
 ]
 

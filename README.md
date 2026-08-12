@@ -21,7 +21,7 @@ pip install -e ".[dev]"
 ```
 
 This installs the project itself plus the test/dev dependencies (`pytest`,
-`pytest-html`, `requests-mock`, `Faker`) declared in `pyproject.toml`.
+`pytest-html`, `Faker`) declared in `pyproject.toml`.
 
 ## Configuration
 
@@ -60,11 +60,8 @@ pytest tests/ -v
 Useful variations:
 
 ```bash
-# Only the unit tests (models, settings, client, factory)
-pytest tests/unit/ -v
-
-# Only the end-to-end API suites
-pytest tests/users/ -v
+# Run a single suite
+pytest tests/users/test_delete.py -v
 
 # Generate JUnit + self-contained HTML reports, same as CI
 pytest tests/ --junitxml=reports/junit.xml --html=reports/report.html --self-contained-html
@@ -72,11 +69,9 @@ pytest tests/ --junitxml=reports/junit.xml --html=reports/report.html --self-con
 
 A session-scoped, autouse fixture in `tests/conftest.py` sweeps both `dev`
 and `prod` for leftover `qa-*` test users at the start of every run, so the
-suite is safe to re-run without manual cleanup. That fixture lives at the
-`tests/` root, so it also runs before `tests/unit/` — meaning **any**
-invocation of pytest against this repo, including a unit-only run, needs
-`SDET_RENDER_BASE_URL`/`SDET_AUTH_TOKEN` set and makes live requests to both
-environments before the first test executes.
+suite is safe to re-run without manual cleanup. Any invocation of pytest
+against this repo needs `SDET_RENDER_BASE_URL`/`SDET_AUTH_TOKEN` set and
+makes live requests to both environments before the first test executes.
 
 Individual tests clean up whatever users they create — via the
 `created_user_cleanup` fixture, an explicit `delete_user` call as part of
@@ -144,11 +139,6 @@ src/
 
 tests/
   conftest.py              # env-parametrized users_client fixture, cleanup fixtures
-  unit/
-    test_models.py          # model validation (field bounds, email format, etc.)
-    test_settings.py        # settings loading
-    test_user_factory.py    # factory/builder behavior
-    test_users_client.py    # client request construction, mocked with requests-mock
   users/
     test_create.py                  # POST /users
     test_read.py                    # GET /users, GET /users/{email}
