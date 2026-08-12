@@ -67,5 +67,5 @@ jobs:
           path: reports/
 
       - name: "7. Report results to TestRail"
-        if: always()
+        if: always() && env.TESTRAIL_API_KEY != ''
         run: python -m src.reporting.testrail_reporter reports/${{ matrix.environment }}-junit.xml ${{ matrix.environment }}
