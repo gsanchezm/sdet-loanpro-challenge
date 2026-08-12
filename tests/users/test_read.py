@@ -1,4 +1,3 @@
-# tests/users/test_read.py
 from src.factories.user_factory import UserFactory
 
 

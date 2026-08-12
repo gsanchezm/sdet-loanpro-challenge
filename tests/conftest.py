@@ -1,4 +1,3 @@
-# tests/conftest.py
 import os
 import uuid
 import warnings

@@ -1,4 +1,3 @@
-# tests/users/test_delete.py
 from src.factories.user_factory import UserFactory
 from src.config.settings import get_settings
 

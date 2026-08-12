@@ -1,6 +1,5 @@
 from src.clients.base_client import BaseClient
 
-
 class UsersClient:
     def __init__(self, base_client: BaseClient, auth_token: str):
         self._client = base_client

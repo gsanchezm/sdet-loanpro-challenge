@@ -1,4 +1,3 @@
-# tests/users/test_update.py
 import uuid
 from src.factories.user_factory import UserFactory, UserPayloadBuilder
 
