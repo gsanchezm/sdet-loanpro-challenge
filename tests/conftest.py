@@ -17,10 +17,10 @@ def _active_environments() -> list[str]:
         return ALL_ENVIRONMENTS
     envs = [env.strip() for env in raw.split(",") if env.strip()]
     invalid = [env for env in envs if env not in VALID_ENVIRONMENTS]
-    if invalid:
+    if invalid or not envs:
         raise ValueError(
-            f"TEST_ENVIRONMENTS contains invalid value(s) {invalid}; "
-            f"must be a subset of {sorted(VALID_ENVIRONMENTS)}"
+            f"TEST_ENVIRONMENTS={raw!r} is invalid; must be a non-empty, "
+            f"comma-separated subset of {sorted(VALID_ENVIRONMENTS)}"
         )
     return envs
 

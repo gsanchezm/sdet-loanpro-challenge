@@ -8,7 +8,7 @@ test suite in `tests/` run with:
 pytest tests/ -v --junitxml=reports/full-run.xml
 ```
 
-That run produced **98 tests collected, 78 passed, 20 failed**. Every failure below was
+That run produced **75 tests collected, 55 passed, 20 failed**. Every failure below was
 independently reproduced with a direct HTTP request outside the test framework
 (exact status codes and response bodies are included as evidence). Expected behavior
 is drawn from the challenge's OpenAPI spec (`sdet_challenge_api.yml`), which documents
