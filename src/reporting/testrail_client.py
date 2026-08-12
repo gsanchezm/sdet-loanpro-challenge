@@ -1,6 +1,5 @@
 import requests
 
-
 class TestRailClient:
     def __init__(self, base_url: str, username: str, api_key: str):
         self._api_url = base_url.rstrip("/") + "/index.php"

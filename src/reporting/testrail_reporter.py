@@ -1,4 +1,3 @@
-# src/reporting/testrail_reporter.py
 import html
 import json
 import os

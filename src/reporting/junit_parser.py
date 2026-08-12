@@ -1,6 +1,5 @@
 import xml.etree.ElementTree as ET
 
-
 def _split_function_and_variant(test_name: str) -> tuple[str, str | None]:
     if "[" not in test_name:
         return test_name, None
