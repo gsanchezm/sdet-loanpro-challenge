@@ -1,4 +1,5 @@
 import uuid
+import pytest
 from src.factories.user_factory import UserFactory, UserPayloadBuilder
 
 
@@ -39,6 +40,7 @@ def test_update_user_rejects_out_of_range_age(users_client, unique_email, create
     assert response.status_code == 400
 
 
+@pytest.mark.characterization
 def test_update_user_changing_email_in_body(users_client, unique_email, created_user_cleanup):
     """PUT documents a 409 for duplicate email, implying the body's email can differ
     from the path's — this characterizes what actually happens when it does."""

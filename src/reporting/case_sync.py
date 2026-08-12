@@ -35,7 +35,7 @@ def _ensure_cases(client: TestRailClient, project_id: int, suite_id: int, sectio
     return {entry["title"]: _sync_one_case(client, section_id, existing, entry) for entry in entries}
 
 def sync_cases(client: TestRailClient, project_id: int, catalog: list[dict]) -> dict[str, int]:
-    suite_id = client.get_suites(project_id)[0]["id"]
+    suite_id = client.get_default_suite_id(project_id)
     section_names = sorted({entry["section"] for entry in catalog})
     section_ids = _ensure_sections(client, project_id, suite_id, section_names)
 

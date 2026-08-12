@@ -1,3 +1,4 @@
+import argparse
 import html
 import json
 import os
@@ -70,7 +71,7 @@ def main(junit_xml_path: str, environment_label: str) -> None:
 
     settings = get_testrail_settings()
     client = TestRailClient(settings.base_url, settings.username, settings.api_key)
-    suite_id = client.get_suites(settings.project_id)[0]["id"]
+    suite_id = client.get_default_suite_id(settings.project_id)
 
     run_label = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     run = client.add_run(settings.project_id, suite_id, f"{environment_label} - {run_label}", [r["case_id"] for r in results])
@@ -81,5 +82,13 @@ def main(junit_xml_path: str, environment_label: str) -> None:
     write_step_summary(environment_label, results, run_url)
 
 
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Report a pytest JUnit XML file's results to TestRail")
+    parser.add_argument("junit_xml_path", help="Path to the JUnit XML file produced by pytest")
+    parser.add_argument("environment_label", help="Label for the TestRail run, e.g. 'dev' or 'prod'")
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1], sys.argv[2]))
+    args = _parse_args(sys.argv[1:])
+    sys.exit(main(args.junit_xml_path, args.environment_label))

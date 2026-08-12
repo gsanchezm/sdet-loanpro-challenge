@@ -1,3 +1,4 @@
+import pytest
 from src.factories.user_factory import UserFactory
 from src.config.settings import get_settings
 
@@ -27,6 +28,7 @@ def test_delete_user_with_wrong_token_returns_401(users_client, unique_email, cr
     assert response.status_code == 401
 
 
+@pytest.mark.characterization
 def test_delete_user_with_authorization_header_instead_of_authentication(users_client, unique_email, created_user_cleanup):
     """The spec names the header 'Authentication', not the more common 'Authorization'.
     This characterizes whether the real app is more lenient than the spec."""
@@ -44,6 +46,7 @@ def test_delete_user_returns_404_for_unknown_email(users_client):
     assert response.status_code == 404
 
 
+@pytest.mark.characterization
 def test_delete_user_twice_is_not_a_server_error(users_client, unique_email):
     _create(users_client, unique_email)
     first = users_client.delete_user(unique_email)

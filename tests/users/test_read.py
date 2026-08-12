@@ -1,3 +1,4 @@
+import pytest
 from src.factories.user_factory import UserFactory
 
 
@@ -32,6 +33,7 @@ def test_get_user_returns_404_for_unknown_email(users_client):
     assert "error" in response.json()
 
 
+@pytest.mark.characterization
 def test_get_user_handles_malformed_email_path_gracefully(users_client):
     response = users_client.get_user("not-an-email")
     assert response.status_code in (400, 404)

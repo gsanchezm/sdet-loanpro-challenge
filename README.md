@@ -276,7 +276,7 @@ src/
     user_factory.py       # UserFactory (random valid payloads) and
                            # UserPayloadBuilder (fluent builder for edge cases)
   models/
-    user.py                # User / CreateUserRequest / UpdateUserRequest / ErrorResponse
+    user.py                # UserPayload base + User / CreateUserRequest / UpdateUserRequest / ErrorResponse
   reporting/
     testrail_client.py     # thin TestRail API v2 client (sections/cases/runs)
     case_sync.py            # syncs tests/data/testrail_cases.json catalog to TestRail

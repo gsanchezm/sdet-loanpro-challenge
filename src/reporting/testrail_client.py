@@ -1,22 +1,30 @@
 import requests
 
+DEFAULT_TIMEOUT = 10
+
 class TestRailClient:
     def __init__(self, base_url: str, username: str, api_key: str):
         self._api_url = base_url.rstrip("/") + "/index.php"
         self._auth = (username, api_key)
 
     def _get(self, endpoint: str):
-        response = requests.get(f"{self._api_url}?/api/v2/{endpoint}", auth=self._auth)
+        response = requests.get(f"{self._api_url}?/api/v2/{endpoint}", auth=self._auth, timeout=DEFAULT_TIMEOUT)
         response.raise_for_status()
         return response.json()
 
     def _post(self, endpoint: str, payload: dict):
-        response = requests.post(f"{self._api_url}?/api/v2/{endpoint}", auth=self._auth, json=payload)
+        response = requests.post(f"{self._api_url}?/api/v2/{endpoint}", auth=self._auth, json=payload, timeout=DEFAULT_TIMEOUT)
         response.raise_for_status()
         return response.json() if response.content else None
 
     def get_suites(self, project_id: int) -> list[dict]:
         return self._get(f"get_suites/{project_id}")["suites"]
+
+    def get_default_suite_id(self, project_id: int) -> int:
+        suites = self.get_suites(project_id)
+        if not suites:
+            raise RuntimeError(f"TestRail project {project_id} has no suites configured")
+        return suites[0]["id"]
 
     def get_sections(self, project_id: int, suite_id: int) -> list[dict]:
         return self._get(f"get_sections/{project_id}&suite_id={suite_id}")["sections"]
