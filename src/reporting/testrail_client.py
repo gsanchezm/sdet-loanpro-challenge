@@ -14,7 +14,7 @@ class TestRailClient:
     def _post(self, endpoint: str, payload: dict):
         response = requests.post(f"{self._api_url}?/api/v2/{endpoint}", auth=self._auth, json=payload)
         response.raise_for_status()
-        return response.json()
+        return response.json() if response.content else None
 
     def get_suites(self, project_id: int) -> list[dict]:
         return self._get(f"get_suites/{project_id}")["suites"]
@@ -44,3 +44,6 @@ class TestRailClient:
 
     def get_runs(self, project_id: int) -> list[dict]:
         return self._get(f"get_runs/{project_id}")["runs"]
+
+    def delete_run(self, run_id: int) -> None:
+        self._post(f"delete_run/{run_id}", {})
