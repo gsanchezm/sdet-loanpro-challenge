@@ -9,6 +9,97 @@ The findings from this suite are written up in [`BUGS.md`](BUGS.md): 5
 confirmed defects, each backed by reproduction steps and evidence captured
 outside the test framework.
 
+## Architecture
+
+The framework is layered — each layer depends only on the one below it, and
+tests are organized as vertical slices by capability (Create / Read / Update
+/ Delete & Authentication / Validation Boundaries / Environment Isolation)
+rather than by environment, so `dev` and `prod` share the same test code and
+any divergence between them shows up as a failure, not a separate test file.
+
+```
+config      -> models      -> clients     -> test data    -> fixtures    -> tests
+(env vars)     (schemas)      (facade)       (factory/      (dev/prod       (assertions
+                                               builder/       parametrize,    against the
+                                               JSON data)     cleanup)        OpenAPI spec)
+```
+
+`src/reporting/` sits outside that chain entirely — it consumes the JUnit XML
+pytest already produces, after the fact, rather than participating in test
+execution (see "Test case management" below for why).
+
+### Layers
+
+- **Config** (`src/config/`) — two `pydantic-settings` classes, `Settings`
+  (`SDET_*` env vars, for the API under test) and `TestRailSettings`
+  (`TESTRAIL_*` env vars, for reporting). Both declare `extra="ignore"`
+  because they read from the same local `.env` file and would otherwise
+  reject each other's keys.
+- **Models** (`src/models/user.py`) — Pydantic schemas (`User`,
+  `CreateUserRequest`, `UpdateUserRequest`, `ErrorResponse`) mirroring the
+  OpenAPI spec, used to validate response shapes (e.g.
+  `ErrorResponse.model_validate(...)` in `test_validation_boundaries.py`).
+- **Clients** (`src/clients/`) — a Facade over `requests`: `BaseClient` is a
+  thin `requests.Session` wrapper (`get`/`post`/`put`/`delete`), `UsersClient`
+  is the domain-specific surface built on top of it (`create_user`,
+  `get_user`, `delete_user`, ...). Tests never call `requests` directly.
+- **Test data** (`src/factories/`, `src/data/`) — a Factory
+  (`UserFactory.valid_payload()`, randomized valid data via `Faker`) and a
+  Builder (`UserPayloadBuilder`, a fluent API for constructing intentionally
+  invalid or edge-case payloads: `.without_field()`, `.with_extra_field()`,
+  `.with_age(151)`, ...), plus a data-driven layer — literal boundary values
+  live in `tests/data/parametrize_data.json`, loaded through
+  `src/data/loader.py` rather than hardcoded in `@pytest.mark.parametrize`.
+- **Fixtures** (`tests/conftest.py`) — `pytest_generate_tests` auto-
+  parametrizes any test that requests `users_client` across `dev`/`prod` (or
+  a subset, via `TEST_ENVIRONMENTS`); `created_user_cleanup` and a session-
+  scoped autouse sweep handle teardown, including recovery from a prior
+  crashed run.
+- **Tests** (`tests/users/`) — one file per capability. These are
+  characterization/contract tests: assertions encode what the OpenAPI spec
+  documents, not what the API currently does. A failing test that correctly
+  exposes a real defect is left failing and written up in `BUGS.md` — the
+  assertion is never loosened to make the suite green.
+- **Reporting** (`src/reporting/`) — decoupled from the layers above; see
+  "Test case management" below.
+
+### Design patterns and principles
+
+- **Facade** — `BaseClient`/`UsersClient` hide HTTP/`requests` details
+  behind a small, domain-specific API.
+- **Factory** — `UserFactory` produces randomized valid payloads on demand.
+- **Builder** — `UserPayloadBuilder` fluently constructs payloads that
+  deviate from valid in exactly one dimension, so each negative test only
+  has to state the deviation under test.
+- **Data-driven testing** — parametrize values live in JSON
+  (`tests/data/parametrize_data.json`, `tests/data/testrail_cases.json`),
+  separating test logic from test data; adding a boundary value is a data
+  edit, not a code change.
+- **Contract/characterization testing** — the suite asserts the documented
+  contract, not observed behavior. This is deliberate: the whole point of
+  the suite is to surface where the real API diverges from its own spec.
+- **Guard clauses over branching** — the codebase avoids `if`/`else`
+  branching statements, preferring early `return`/`continue` and dict/map
+  lookups (e.g. `STATUS_ID = {True: 1, False: 5}` in
+  `src/reporting/testrail_reporter.py`) over multi-branch conditionals.
+- **Single source of truth** — `tests/data/testrail_cases.json` (the case
+  catalog) and `tests/data/testrail_case_ids.json` (the generated
+  function → case-id map) are read by both `case_sync.py` and
+  `testrail_reporter.py`; neither script duplicates the other's data.
+- **Idempotency** — `case_sync.py` matches existing TestRail sections/cases
+  by exact name/title before creating anything, so re-running it is safe.
+- **Test isolation and cleanup discipline** — every test that creates data
+  cleans it up itself (fixture, explicit delete, or `try`/`finally`); the
+  session-scoped sweep is the safety net for whatever a normal test run
+  doesn't catch (e.g. a prior crashed run).
+
+### Tech stack
+
+Python 3.11+, `pytest`, `requests`, `pydantic` / `pydantic-settings` v2,
+`Faker`, `pytest-html`, GitHub Actions, TestRail API v2. No pytest plugins
+or hooks are used for reporting — `src/reporting/` is plain scripts that
+parse JUnit XML and call TestRail's REST API directly.
+
 ## Prerequisites
 
 - Python 3.11+
