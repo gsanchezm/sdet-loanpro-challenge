@@ -60,7 +60,7 @@ pytest tests/ -v
 Useful variations:
 
 ```bash
-# Only the unit tests (models, settings, client, factory — no network calls)
+# Only the unit tests (models, settings, client, factory)
 pytest tests/unit/ -v
 
 # Only the end-to-end API suites
@@ -70,10 +70,19 @@ pytest tests/users/ -v
 pytest tests/ --junitxml=reports/junit.xml --html=reports/report.html --self-contained-html
 ```
 
-Every test that creates a user cleans up after itself, and a session-scoped
-fixture also sweeps both environments at the start of the run for any
-leftover `qa-*` test users from prior runs, so the suite is safe to re-run
-without manual cleanup.
+A session-scoped, autouse fixture in `tests/conftest.py` sweeps both `dev`
+and `prod` for leftover `qa-*` test users at the start of every run, so the
+suite is safe to re-run without manual cleanup. That fixture lives at the
+`tests/` root, so it also runs before `tests/unit/` — meaning **any**
+invocation of pytest against this repo, including a unit-only run, needs
+`SDET_RENDER_BASE_URL`/`SDET_AUTH_TOKEN` set and makes live requests to both
+environments before the first test executes.
+
+Individual tests clean up whatever users they create — via the
+`created_user_cleanup` fixture, an explicit `delete_user` call as part of
+the test itself, or a `try`/`finally` block in the environment-isolation
+suite — so a normal test run should not leave data behind in either
+environment.
 
 ## Continuous integration
 
@@ -95,9 +104,12 @@ API has confirmed bugs (see `BUGS.md`), and the pipeline is expected to
 report red until those are fixed. Suppressing that failure would defeat the
 purpose of the suite.
 
-CI reads `SDET_RENDER_BASE_URL` from a repository variable and
-`SDET_AUTH_TOKEN` from a repository secret — both must be configured in the
-repository's settings for the workflow to run against a real deployment.
+The workflow sets `SDET_RENDER_BASE_URL` and `SDET_AUTH_TOKEN` from a
+repository variable and secret named `RENDER_BASE_URL` and `AUTH_TOKEN`
+respectively (`vars.RENDER_BASE_URL`, `secrets.AUTH_TOKEN` in `ci.yml`) —
+note these names do **not** carry the `SDET_` prefix used locally. Both must
+be configured under the repository's Settings → Secrets and variables →
+Actions for the workflow to run against a real deployment.
 
 ## Known bugs
 
