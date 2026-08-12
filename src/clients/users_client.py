@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from src.clients.base_client import BaseClient
 
 class UsersClient:
@@ -12,12 +14,12 @@ class UsersClient:
         return self._client.post("/users", json=payload)
 
     def get_user(self, email: str):
-        return self._client.get(f"/users/{email}")
+        return self._client.get(f"/users/{quote(email, safe='')}")
 
     def update_user(self, email: str, payload: dict):
-        return self._client.put(f"/users/{email}", json=payload)
+        return self._client.put(f"/users/{quote(email, safe='')}", json=payload)
 
     def delete_user(self, email: str, *, headers: dict | None = None):
         if headers is None:
             headers = {"Authentication": self._auth_token}
-        return self._client.delete(f"/users/{email}", headers=headers)
+        return self._client.delete(f"/users/{quote(email, safe='')}", headers=headers)
