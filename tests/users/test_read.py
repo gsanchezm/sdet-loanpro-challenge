@@ -1,11 +1,14 @@
 import pytest
 from src.factories.user_factory import UserFactory
+from src.models.user import User
 
 
 def test_list_users_returns_200_and_array(users_client):
     response = users_client.list_users()
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+    for item in response.json():
+        User.model_validate(item)
 
 
 def test_list_users_contains_a_freshly_created_user(users_client, unique_email, created_user_cleanup):
@@ -25,6 +28,7 @@ def test_get_user_by_email_returns_200(users_client, unique_email, created_user_
     response = users_client.get_user(unique_email)
     assert response.status_code == 200
     assert response.json()["email"] == unique_email
+    User.model_validate(response.json())
 
 
 def test_get_user_returns_404_for_unknown_email(users_client):

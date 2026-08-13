@@ -1,6 +1,7 @@
 import pytest
 from src.data.loader import load_dataset
 from src.factories.user_factory import UserFactory, UserPayloadBuilder
+from src.models.user import User
 
 
 def test_create_user_returns_201_with_created_user(users_client, unique_email, created_user_cleanup):
@@ -13,6 +14,7 @@ def test_create_user_returns_201_with_created_user(users_client, unique_email, c
     assert body["email"] == unique_email
     assert body["name"] == payload["name"]
     assert body["age"] == payload["age"]
+    User.model_validate(body)
 
 
 def test_create_user_rejects_duplicate_email(users_client, unique_email, created_user_cleanup):

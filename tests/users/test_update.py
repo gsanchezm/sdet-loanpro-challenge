@@ -1,6 +1,7 @@
 import uuid
 import pytest
 from src.factories.user_factory import UserFactory, UserPayloadBuilder
+from src.models.user import User
 
 
 def test_update_user_returns_200_with_updated_fields(users_client, unique_email, created_user_cleanup):
@@ -14,6 +15,7 @@ def test_update_user_returns_200_with_updated_fields(users_client, unique_email,
     body = response.json()
     assert body["name"] == "Updated Name"
     assert body["age"] == 99
+    User.model_validate(body)
 
 
 def test_update_user_returns_404_for_unknown_email(users_client):
