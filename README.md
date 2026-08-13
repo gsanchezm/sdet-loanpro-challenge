@@ -5,8 +5,8 @@ CRUD operations, authentication, validation boundaries, and dev/prod
 environment isolation. Tests run against the live API deployed on Render,
 both locally and in CI.
 
-The findings from this suite are written up in [`BUGS.md`](BUGS.md): 5
-confirmed defects, each backed by reproduction steps and evidence captured
+The findings from this suite are documented as [GitHub Issues](https://github.com/gsanchezm/sdet-loanpro-challenge/issues?q=is%3Aissue+label%3Abug):
+5 confirmed defects, each backed by reproduction steps and evidence captured
 outside the test framework.
 
 ## Architecture
@@ -58,8 +58,8 @@ execution (see "Test case management" below for why).
 - **Tests** (`tests/users/`) — one file per capability. These are
   characterization/contract tests: assertions encode what the OpenAPI spec
   documents, not what the API currently does. A failing test that correctly
-  exposes a real defect is left failing and written up in `BUGS.md` — the
-  assertion is never loosened to make the suite green.
+  exposes a real defect is left failing and documented as a GitHub Issue —
+  the assertion is never loosened to make the suite green.
 - **Reporting** (`src/reporting/`) — decoupled from the layers above; see
   "Test case management" below.
 
@@ -196,9 +196,9 @@ other, and both report independently. Each job:
    `TESTRAIL_API_KEY` isn't configured) — see Test case management below.
 
 There is deliberately no `continue-on-error` anywhere in the pipeline: the
-API has confirmed bugs (see `BUGS.md`), and the pipeline is expected to
-report red until those are fixed. Suppressing that failure would defeat the
-purpose of the suite.
+API has confirmed bugs (see [Known bugs](#known-bugs)), and the pipeline is
+expected to report red until those are fixed. Suppressing that failure would
+defeat the purpose of the suite.
 
 The workflow sets `SDET_RENDER_BASE_URL` and `SDET_AUTH_TOKEN` from a
 repository variable and secret named `RENDER_BASE_URL` and `AUTH_TOKEN`
@@ -256,9 +256,10 @@ failed, with a comment listing every variant's outcome. Required env vars:
 
 ## Known bugs
 
-Bugs found while building and running this suite are documented in
-[`BUGS.md`](BUGS.md), each with the affected endpoint, expected vs. actual
-behavior, direct reproduction evidence, and the test that exposes it.
+Bugs found while building and running this suite are documented as
+[GitHub Issues](https://github.com/gsanchezm/sdet-loanpro-challenge/issues?q=is%3Aissue+label%3Abug),
+each with the affected endpoint, expected vs. actual behavior, direct
+reproduction evidence, and the test that exposes it.
 
 ## Project structure
 
@@ -298,7 +299,6 @@ tests/
     test_environment_isolation.py   # dev/prod data isolation and parity
 
 .github/workflows/ci.yml   # parallel dev/prod CI pipeline
-BUGS.md                     # confirmed defects found by this suite
 .env.example                 # template for required environment variables
 pyproject.toml               # project metadata, dependencies, pytest config
 ```
