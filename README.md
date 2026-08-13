@@ -11,22 +11,33 @@ outside the test framework.
 
 ## Architecture
 
-The framework is layered — each layer depends only on the one below it, and
-tests are organized as vertical slices by capability (Create / Read / Update
+The framework is layered — read top to bottom as build order, each layer
+building on the ones above it — and tests are organized as vertical slices
+by capability (Create / Read / Update
 / Delete & Authentication / Validation Boundaries / Environment Isolation)
 rather than by environment, so `dev` and `prod` share the same test code and
 any divergence between them shows up as a failure, not a separate test file.
-
-```
-config      -> models      -> clients     -> test data    -> fixtures    -> tests
-(env vars)     (schemas)      (facade)       (factory/      (dev/prod       (assertions
-                                               builder/       parametrize,    against the
-                                               JSON data)     cleanup)        OpenAPI spec)
-```
-
 `src/reporting/` sits outside that chain entirely — it consumes the JUnit XML
 pytest already produces, after the fact, rather than participating in test
 execution (see "Test case management" below for why).
+
+```mermaid
+flowchart TB
+    subgraph Trigger["Where a run starts"]
+        Dev["Developer machine<br/>pytest tests/ -v"]
+        CI["GitHub Actions<br/>dev / prod matrix"]
+    end
+
+    Suite["E2E Test Suite<br/>75 pytest instances"]
+    Dev --> Suite
+    CI --> Suite
+
+    Suite -->|HTTP requests| API["User Management API<br/>Render — /dev and /prod"]
+    Suite -->|writes| JUnit["JUnit XML report"]
+    JUnit --> Reporter["testrail_reporter.py"]
+    Reporter -->|REST API| TestRail["TestRail<br/>28 cases, 6 sections"]
+    Suite -.->|confirmed defects, filed by hand| Issues["GitHub Issues"]
+```
 
 ### Layers
 
@@ -35,10 +46,14 @@ execution (see "Test case management" below for why).
   (`TESTRAIL_*` env vars, for reporting). Both declare `extra="ignore"`
   because they read from the same local `.env` file and would otherwise
   reject each other's keys.
-- **Models** (`src/models/user.py`) — Pydantic schemas (`User`,
-  `CreateUserRequest`, `UpdateUserRequest`, `ErrorResponse`) mirroring the
-  OpenAPI spec, used to validate response shapes (e.g.
-  `ErrorResponse.model_validate(...)` in `test_validation_boundaries.py`).
+- **Models** (`src/models/user.py`) — Pydantic schemas (a shared
+  `UserPayload` base, `User`, `CreateUserRequest`, `UpdateUserRequest`,
+  `ErrorResponse`) mirroring the OpenAPI spec. `User.model_validate(...)`
+  validates success-response bodies in `test_create.py`, `test_read.py`, and
+  `test_update.py`; `ErrorResponse.model_validate(...)` validates the shared
+  error shape in `test_validation_boundaries.py`. `CreateUserRequest`/
+  `UpdateUserRequest` document the request schemas but are deliberately not
+  used for response validation.
 - **Clients** (`src/clients/`) — a Facade over `requests`: `BaseClient` is a
   thin `requests.Session` wrapper (`get`/`post`/`put`/`delete`), `UsersClient`
   is the domain-specific surface built on top of it (`create_user`,
@@ -52,9 +67,9 @@ execution (see "Test case management" below for why).
   `src/data/loader.py` rather than hardcoded in `@pytest.mark.parametrize`.
 - **Fixtures** (`tests/conftest.py`) — `pytest_generate_tests` auto-
   parametrizes any test that requests `users_client` across `dev`/`prod` (or
-  a subset, via `TEST_ENVIRONMENTS`); `created_user_cleanup` and a session-
-  scoped autouse sweep handle teardown, including recovery from a prior
-  crashed run.
+  a subset, via `TEST_ENVIRONMENTS`); `created_user_cleanup` tears down data
+  each test creates, and a session-scoped autouse sweep cleans up before the
+  session's first test, recovering from a prior crashed run.
 - **Tests** (`tests/users/`) — one file per capability. These are
   characterization/contract tests: assertions encode what the OpenAPI spec
   documents, not what the API currently does. A failing test that correctly
@@ -63,35 +78,84 @@ execution (see "Test case management" below for why).
 - **Reporting** (`src/reporting/`) — decoupled from the layers above; see
   "Test case management" below.
 
+```mermaid
+flowchart LR
+    Config["Config<br/>SDET_ / TESTRAIL_ env vars"] --> Models["Models<br/>Pydantic schemas"]
+    Models --> Clients["Clients<br/>Facade over requests"]
+    Clients --> TestData["Test Data<br/>Factory / Builder / JSON"]
+    TestData --> Fixtures["Fixtures<br/>dev/prod parametrize, cleanup"]
+    Fixtures --> Tests["Tests<br/>tests/users/*.py"]
+    Tests -.->|JUnit XML, after the run| Reporting["Reporting<br/>src/reporting/"]
+```
+
 ### Design patterns and principles
 
-- **Facade** — `BaseClient`/`UsersClient` hide HTTP/`requests` details
-  behind a small, domain-specific API.
-- **Factory** — `UserFactory` produces randomized valid payloads on demand.
-- **Builder** — `UserPayloadBuilder` fluently constructs payloads that
-  deviate from valid in exactly one dimension, so each negative test only
-  has to state the deviation under test.
-- **Data-driven testing** — parametrize values live in JSON
-  (`tests/data/parametrize_data.json`, `tests/data/testrail_cases.json`),
-  separating test logic from test data; adding a boundary value is a data
-  edit, not a code change.
-- **Contract/characterization testing** — the suite asserts the documented
-  contract, not observed behavior. This is deliberate: the whole point of
-  the suite is to surface where the real API diverges from its own spec.
+This section is split into three groups: **design patterns** are structural
+(how objects collaborate), **principles** are cross-cutting engineering
+habits applied throughout the codebase, and **testing techniques** are
+decisions specific to how the test suite itself is built.
+
+#### Design patterns
+
+- **Facade** — `BaseClient`/`UsersClient` (`src/clients/`) hide HTTP/
+  `requests` details behind a small, domain-specific API. Tests call
+  `users_client.create_user(payload)`, never `requests.post(...)` directly.
+- **Factory** — `UserFactory` (`src/factories/user_factory.py`) produces
+  randomized valid payloads on demand via `Faker`.
+- **Builder** — `UserPayloadBuilder` (`src/factories/user_factory.py`)
+  fluently constructs payloads that deviate from valid in exactly one
+  dimension (`.without_field()`, `.with_extra_field()`, `.with_age(151)`),
+  so each negative test only has to state the deviation under test.
+
+#### Principles
+
 - **Guard clauses over branching** — the codebase avoids `if`/`else`
   branching statements, preferring early `return`/`continue` and dict/map
   lookups (e.g. `STATUS_ID = {True: 1, False: 5}` in
-  `src/reporting/testrail_reporter.py`) over multi-branch conditionals.
-- **Single source of truth** — `tests/data/testrail_cases.json` (the case
-  catalog) and `tests/data/testrail_case_ids.json` (the generated
+  `src/reporting/testrail_reporter.py`) over multi-branch conditionals. See
+  `tests/conftest.py`'s `_active_environments()` and
+  `src/reporting/case_sync.py`'s `_sync_one_case()` for more examples.
+- **Single source of truth (DRY)** — `tests/data/testrail_cases.json` (the
+  case catalog) and `tests/data/testrail_case_ids.json` (the generated
   function → case-id map) are read by both `case_sync.py` and
-  `testrail_reporter.py`; neither script duplicates the other's data.
+  `testrail_reporter.py`; neither script duplicates the other's data. The
+  `UserPayload` base model (`src/models/user.py`) is the single definition
+  of `name`/`email`/`age`, shared by `User`, `CreateUserRequest`, and
+  `UpdateUserRequest` — the latter two are defined for documentation
+  purposes only (they mirror the request schemas) and aren't instantiated
+  anywhere in the suite.
 - **Idempotency** — `case_sync.py` matches existing TestRail sections/cases
   by exact name/title before creating anything, so re-running it is safe.
 - **Test isolation and cleanup discipline** — every test that creates data
   cleans it up itself (fixture, explicit delete, or `try`/`finally`); the
-  session-scoped sweep is the safety net for whatever a normal test run
-  doesn't catch (e.g. a prior crashed run).
+  session-scoped sweep in `tests/conftest.py` is the safety net for whatever
+  a normal test run doesn't catch (e.g. a prior crashed run).
+- **Fail fast on misconfiguration** — `tests/conftest.py` rejects an invalid
+  `TEST_ENVIRONMENTS` value immediately instead of silently running against
+  a wrong or empty environment set; `TestRailClient.get_default_suite_id`
+  raises a clear error instead of an `IndexError` if a TestRail project has
+  no suites.
+
+#### Testing techniques
+
+- **Data-driven testing (DDT)** — parametrize values live in JSON
+  (`tests/data/parametrize_data.json`), loaded through
+  `src.data.loader.load_dataset` instead of being hardcoded in
+  `@pytest.mark.parametrize`; adding a boundary value is a data edit, not a
+  code change.
+- **Contract/characterization testing** — the suite asserts the documented
+  contract, not observed behavior. This is deliberate: the whole point of
+  the suite is to surface where the real API diverges from its own spec. The
+  handful of tests that intentionally accept more than one outcome (because
+  the spec itself is ambiguous, or the point is to characterize real
+  behavior rather than enforce a single result) are marked
+  `@pytest.mark.characterization`, so they can be run or excluded on their
+  own: `pytest -m characterization` / `pytest -m "not characterization"`.
+- **Response schema validation** — beyond individual field checks
+  (`assert body["email"] == ...`), success responses are validated against
+  the `User` Pydantic model and error responses against `ErrorResponse`, so a
+  missing field or a value that can't be coerced to the declared type fails
+  the test even if every individually-checked field happens to be correct.
 
 ### Tech stack
 
@@ -142,13 +206,16 @@ To restrict a run to one environment, set `TEST_ENVIRONMENTS`:
 TEST_ENVIRONMENTS=dev pytest tests/ -v
 ```
 
+The API under test is deployed as a Docker image on [Render](https://render.com):
+
+![Render deployment](docs/screenshots/render-deployment.jpg)
+
 ## Test data
 
-Parametrized values that used to be hardcoded in `@pytest.mark.parametrize`
-(boundary ages, invalid emails, missing-field names) live in
-[`tests/data/parametrize_data.json`](tests/data/parametrize_data.json),
-loaded through `src.data.loader.load_dataset`. To add a new boundary value,
-edit the JSON file — no test code changes needed.
+Boundary ages, invalid emails, and missing-field names live in
+[`tests/data/parametrize_data.json`](tests/data/parametrize_data.json) (see
+"Data-driven testing" above) — edit the JSON file to add a new boundary
+value, no test code changes needed.
 
 ## Running the suite locally
 
@@ -165,6 +232,11 @@ pytest tests/users/test_delete.py -v
 # Generate JUnit + self-contained HTML reports, same as CI
 pytest tests/ --junitxml=reports/junit.xml --html=reports/report.html --self-contained-html
 ```
+
+The self-contained HTML report from the last local run — 75 tests, 20 failed
+(the 5 known bugs) / 55 passed:
+
+![pytest-html report](docs/screenshots/pytest-html-report.jpg)
 
 A session-scoped, autouse fixture in `tests/conftest.py` sweeps both `dev`
 and `prod` for leftover `qa-*` test users at the start of every run, so the
@@ -195,6 +267,12 @@ other, and both report independently. Each job:
 4. Reports results to TestRail (`if: always()`, skipped if
    `TESTRAIL_API_KEY` isn't configured) — see Test case management below.
 
+A recent run — both `dev` and `prod` legs failing exactly where the 5 known
+bugs predict, with each job's step summary linking to the TestRail run it
+just created:
+
+![GitHub Actions run](docs/screenshots/github-actions-run.jpg)
+
 There is deliberately no `continue-on-error` anywhere in the pipeline: the
 API has confirmed bugs (see [Known bugs](#known-bugs)), and the pipeline is
 expected to report red until those are fixed. Suppressing that failure would
@@ -209,10 +287,14 @@ Actions for the workflow to run against a real deployment.
 
 The TestRail integration needs its own configuration: `TESTRAIL_BASE_URL`,
 `TESTRAIL_USERNAME`, and `TESTRAIL_PROJECT_ID` as repository variables, and
-`TESTRAIL_API_KEY` as a repository secret, for step 7 to run — it's
-automatically skipped otherwise (see above).
+`TESTRAIL_API_KEY` as a repository secret, for the "Report results to
+TestRail" step (step 4 above) to run — it's automatically skipped otherwise.
 
 ## Test case management
+
+The project lives in [TestRail](https://loanpro.testrail.io/index.php?/projects/overview/2)
+(private — requires an account on this TestRail instance to open; the
+screenshots below are the public evidence of what it contains).
 
 Test names read cleanly as TestRail case titles, grouped by capability
 (Create / Delete & Authentication / Environment Isolation / Read / Update /
@@ -253,6 +335,11 @@ TestRail Run, and posts the results — a case is Failed if any of its variants
 failed, with a comment listing every variant's outcome. Required env vars:
 `TESTRAIL_BASE_URL`, `TESTRAIL_USERNAME`, `TESTRAIL_API_KEY`,
 `TESTRAIL_PROJECT_ID` (see `.env.example`).
+
+A run in TestRail, populated automatically by the CI job above — cases
+grouped by section, each with a real Passed/Failed result:
+
+![TestRail run results](docs/screenshots/testrail-run-results.jpg)
 
 ## Known bugs
 
@@ -299,6 +386,7 @@ tests/
     test_environment_isolation.py   # dev/prod data isolation and parity
 
 .github/workflows/ci.yml   # parallel dev/prod CI pipeline
+docs/screenshots/          # Render, GitHub Actions, TestRail, pytest-html evidence
 .env.example                 # template for required environment variables
 pyproject.toml               # project metadata, dependencies, pytest config
 ```
