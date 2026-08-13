@@ -159,10 +159,20 @@ decisions specific to how the test suite itself is built.
 
 ### Tech stack
 
-Python 3.11+, `pytest`, `requests`, `pydantic` / `pydantic-settings` v2,
-`Faker`, `pytest-html`, GitHub Actions, TestRail API v2. No pytest plugins
-or hooks are used for reporting — `src/reporting/` is plain scripts that
-parse JUnit XML and call TestRail's REST API directly.
+| Tool                              | Role in this project                                                                                                                     |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| **Python 3.11+**                   | Language runtime for the whole framework.                                                                                               |
+| **pytest**                         | Test runner and fixture engine — drives `dev`/`prod` parametrization (`pytest_generate_tests`), cleanup fixtures, and markers.          |
+| **requests**                       | HTTP client underlying the Facade clients (`BaseClient`/`UsersClient` in `src/clients/`); tests never call it directly.                 |
+| **pydantic / pydantic-settings v2**| Response/schema validation (`User`, `ErrorResponse` models in `src/models/`) and typed, `.env`-backed configuration (`Settings`, `TestRailSettings`). |
+| **email-validator**                | Backs pydantic's `EmailStr` field type, used to validate the `email` field on every user payload.                                       |
+| **Faker**                          | Generates randomized valid test data (`UserFactory.valid_payload()`).                                                                   |
+| **pytest-html**                    | Produces the self-contained HTML test report (`--html=reports/report.html --self-contained-html`), locally and in CI.                   |
+| **GitHub Actions**                 | CI — runs the suite on every push/PR as a parallel `dev`/`prod` matrix and uploads JUnit/HTML report artifacts.                          |
+| **TestRail API v2**                | Test case management and results reporting, called directly via `src/reporting/` — no pytest plugin in between.                         |
+
+No pytest plugins or hooks are used for reporting — `src/reporting/` is
+plain scripts that parse JUnit XML and call TestRail's REST API directly.
 
 ## Prerequisites
 
